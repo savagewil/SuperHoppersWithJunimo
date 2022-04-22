@@ -20,7 +20,7 @@ namespace SuperHopper
         *********/
         /// <summary>The <see cref="Item.modData"/> flag which indicates a hopper is a super hopper.</summary>
         private readonly string ModDataFlag = "spacechase0.SuperHopper";
-        private const LOG_MODE = false;
+        private const bool LOG_MODE = false;
         private static List<Chest> junimoHoppersPush;
         private static List<Chest> junimoHoppersPull;
 
