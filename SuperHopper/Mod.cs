@@ -58,9 +58,20 @@ namespace SuperHopper
             {
                 if (hopper.heldObject.Value == null)
                 {
-                    if (Utility.IsNormalObjectAtParentSheetIndex(Game1.player.ActiveObject, SObject.iridiumBar))
+                    if (ValidItem(Game1.player.ActiveObject))
                     {
-                        hopper.Tint = Color.DarkViolet;
+                        if (Utility.IsNormalObjectAtParentSheetIndex(Game1.player.ActiveObject, SObject.topazIndex)) {
+                            hopper.Tint = Color.Orange;
+                        } else if (Utility.IsNormalObjectAtParentSheetIndex(Game1.player.ActiveObject, SObject.aquamarineIndex)) {
+                            hopper.Tint = Color.Blue;
+                        }else if (Utility.IsNormalObjectAtParentSheetIndex(Game1.player.ActiveObject, SObject.emeraldIndex)) {
+                            hopper.Tint = Color.Green;
+                        }else if (
+                            Utility.IsNormalObjectAtParentSheetIndex(Game1.player.ActiveObject, SObject.amethystClusterIndex) ||
+                            Utility.IsNormalObjectAtParentSheetIndex(Game1.player.ActiveObject, SObject.iridiumBar)) {
+                            hopper.Tint = Color.DarkViolet;
+                        };
+                        
                         hopper.heldObject.Value = (SObject)Game1.player.ActiveObject.getOne();
                         hopper.modData[this.ModDataFlag] = "1";
 
@@ -75,7 +86,7 @@ namespace SuperHopper
                 else if (Game1.player.CurrentItem == null)
                 {
                     hopper.Tint = Color.White;
-                    hopper.heldObject.Value = null;
+                    //hopper.heldObject.Value = null;
                     hopper.modData.Remove(this.ModDataFlag);
                     
                     if (junimoHoppersPush.Contains(hopper)) {
@@ -84,8 +95,14 @@ namespace SuperHopper
                     if (junimoHoppersPull.Contains(hopper)) {
                         junimoHoppersPull.Remove(hopper);
                     }
-
-                    Game1.player.addItemToInventory(new SObject(SObject.iridiumBar, 1));
+                    //if (Utility.IsNormalObjectAtParentSheetIndex(hopper.heldObject.Value, SObject.iridiumBar)){
+                    //    Game1.player.addItemToInventory(new SObject(SObject.iridiumBar, 1));
+                    //}
+                    //else if (Utility.IsNormalObjectAtParentSheetIndex(hopper.heldObject.Value, SObject.topazIndex)){
+                    //    Game1.player.addItemToInventory(new SObject(SObject.topazIndex, 1));
+                    //}
+                    Game1.player.addItemToInventory(hopper.heldObject.Value);
+                    hopper.heldObject.Value = null;
 
                     Game1.playSound("shiny4");
                 }
@@ -98,14 +115,16 @@ namespace SuperHopper
         private void OnMachineMinutesElapsed(SObject machine, GameLocation location)
         {
             // not super hopper
-            if (!this.TryGetHopper(machine, out Chest hopper) || hopper.heldObject.Value == null || !Utility.IsNormalObjectAtParentSheetIndex(hopper.heldObject.Value, SObject.iridiumBar))
+            if (!this.TryGetHopper(machine, out Chest hopper) || !ValidItem(hopper.heldObject.Value))
                 return;
+
             if (junimoHoppersPull.Contains(hopper))
             {
                 hopper = junimoHoppersPull[0];
             }else if (junimoHoppersPush.Contains(hopper)){
                 hopper = junimoHoppersPush[0];
             }
+
             bool turnPull = junimoHoppersPull.Count == 0 || !junimoHoppersPull.Contains(hopper) || junimoHoppersPull[0] == hopper;
             bool turnPush = junimoHoppersPush.Count == 0 || !junimoHoppersPush.Contains(hopper) || junimoHoppersPush[0] == hopper;
 
@@ -114,20 +133,11 @@ namespace SuperHopper
             if (!hopper.modData.ContainsKey(this.ModDataFlag))
                 hopper.modData[this.ModDataFlag] = "1";
 
+           
             // no chests to transfer
-            if (!location.objects.TryGetValue(hopper.TileLocation - new Vector2(0, 1), out SObject objAbove) ||
-                objAbove is not Chest chestAbove)
-            {
-                if (junimoHoppersPull.Contains(hopper))
-                {
-                    junimoHoppersPull.Remove(hopper);
-                }else if (junimoHoppersPush.Contains(hopper))
-                {
-                    junimoHoppersPush.Remove(hopper);
-                }
-                return;
-            }
-            if (!location.objects.TryGetValue(hopper.TileLocation + new Vector2(0, 1), out SObject objBelow) || objBelow is not Chest chestBelow)
+            if (TryGetInputOutputChest(hopper, location,
+                out Chest inChest, out Chest outChest,
+                out bool PullingJunimo, out bool PushingJunimo))
             {
                 if (junimoHoppersPull.Contains(hopper))
                 {
@@ -139,21 +149,22 @@ namespace SuperHopper
                 return;
             }
             
-            bool PullingJunimo = objAbove is Chest { SpecialChestType: Chest.SpecialChestTypes.JunimoChest };
-            bool PushingJunimo = objBelow is Chest { SpecialChestType: Chest.SpecialChestTypes.JunimoChest };
+            //bool PullingJunimo = inChest.specialChestType == Chest.SpecialChestTypes.JunimoChest;
+            //bool PushingJunimo = outChest.specialChestType == Chest.SpecialChestTypes.JunimoChest;
             
             Log.Info($"Junimo? PullingJunimo:{PullingJunimo} PushingJunimo:{PushingJunimo}");
+            Log.Info($"Junimo? {inChest.specialChestType} PullingJunimo:{PullingJunimo} {outChest.specialChestType} PushingJunimo:{PushingJunimo}");
             // transfer items
-            chestAbove.clearNulls();
+            inChest.clearNulls();
 
             bool moved = false;
 
             if ((turnPull || !PullingJunimo) && (turnPush || !PushingJunimo)) {
-                for (int i = chestAbove.GetItemsForPlayer(Game1.player.UniqueMultiplayerID).Count - 1; (i >= 0 && ((!(PullingJunimo || PushingJunimo)) || !moved)); i--)
+                for (int i = inChest.GetItemsForPlayer(Game1.player.UniqueMultiplayerID).Count - 1; (i >= 0 && ((!(PullingJunimo || PushingJunimo)) || !moved)); i--)
                 {
-                    Item item = chestAbove.GetItemsForPlayer(Game1.player.UniqueMultiplayerID)[i];
-                    if (chestBelow.addItem(item) == null) { 
-                        chestAbove.GetItemsForPlayer(Game1.player.UniqueMultiplayerID).RemoveAt(i);
+                    Item item = inChest.GetItemsForPlayer(Game1.player.UniqueMultiplayerID)[i];
+                    if (outChest.addItem(item) == null) { 
+                        inChest.GetItemsForPlayer(Game1.player.UniqueMultiplayerID).RemoveAt(i);
                         moved = true;
                     }
                 }
@@ -162,17 +173,17 @@ namespace SuperHopper
                 junimoHoppersPull.Add(hopper);
                 Log.Info($"Add to pull");
             }
-            if (PushingJunimo && !chestAbove.isEmpty() && turnPush && (!moved) && (!junimoHoppersPush.Contains(hopper))) {
+            if (PushingJunimo && !inChest.isEmpty() && turnPush && (!moved) && (!junimoHoppersPush.Contains(hopper))) {
                 junimoHoppersPush.Add(hopper);
                 Log.Info($"Add to push");
             }
             else if (moved){
                 if (junimoHoppersPush.Contains(hopper)) junimoHoppersPush.Remove(hopper);
-                if (PushingJunimo && !chestAbove.isEmpty()) junimoHoppersPush.Add(hopper);
+                if (PushingJunimo && !inChest.isEmpty()) junimoHoppersPush.Add(hopper);
                 if (junimoHoppersPull.Contains(hopper)) junimoHoppersPull.Remove(hopper);
                 if (PullingJunimo) junimoHoppersPull.Add(hopper);
                 Log.Info("Add Bot");
-            }else if (!moved && PullingJunimo && turnPull && !chestAbove.isEmpty())
+            }else if (!moved && PullingJunimo && turnPull && !inChest.isEmpty())
             {
                 if (junimoHoppersPull.Contains(hopper)) junimoHoppersPull.Remove(hopper);
                 if (PullingJunimo) junimoHoppersPull.Add(hopper);
@@ -200,6 +211,59 @@ namespace SuperHopper
 
             hopper = null;
             return false;
+        }
+
+
+        private bool TryGetInputOutputChest(Chest hopper, GameLocation location,
+            out Chest inChest, out Chest outChest, out bool PullingJunimo, out bool PushingJunimo)
+        {
+            PullingJunimo = false;
+            PushingJunimo = false;
+            Vector2 dirVec = new Vector2(0, 1);
+            if (Utility.IsNormalObjectAtParentSheetIndex(hopper.heldObject.Value, SObject.topazIndex)) {
+                dirVec = new Vector2(-1, 0);
+            } else if (Utility.IsNormalObjectAtParentSheetIndex(hopper.heldObject.Value, SObject.aquamarineIndex)) {
+                dirVec = new Vector2(1, 0);
+            }else if (Utility.IsNormalObjectAtParentSheetIndex(hopper.heldObject.Value, SObject.emeraldIndex)) {
+                dirVec = new Vector2(0, -1);
+            }else if (
+                Utility.IsNormalObjectAtParentSheetIndex(hopper.heldObject.Value, SObject.amethystClusterIndex) ||
+                Utility.IsNormalObjectAtParentSheetIndex(hopper.heldObject.Value, SObject.iridiumBar)) {
+                dirVec = new Vector2(0, 1);
+            };
+
+            if (!location.objects.TryGetValue(hopper.TileLocation - dirVec, out SObject objIn) || objIn is not Chest chestIn)
+            {
+                outChest = null;
+                inChest = null;
+                return true;
+            }
+            if (!location.objects.TryGetValue(hopper.TileLocation + dirVec, out SObject objOut) || objOut is not Chest chestOut)
+            {
+                outChest = null;
+                inChest = null;
+                return true;
+            }
+            PullingJunimo = objIn is Chest { SpecialChestType: Chest.SpecialChestTypes.JunimoChest };
+            PushingJunimo = objOut is Chest { SpecialChestType: Chest.SpecialChestTypes.JunimoChest };
+
+            outChest = chestOut;
+            inChest = chestIn;
+            return false;
+            
+        }
+        
+        
+
+
+        private bool ValidItem(SObject item)
+        {
+            return item != null && (
+                Utility.IsNormalObjectAtParentSheetIndex(item, SObject.topazIndex) ||
+                Utility.IsNormalObjectAtParentSheetIndex(item, SObject.amethystClusterIndex) ||
+                Utility.IsNormalObjectAtParentSheetIndex(item, SObject.aquamarineIndex) ||
+                Utility.IsNormalObjectAtParentSheetIndex(item, SObject.emeraldIndex) ||
+                Utility.IsNormalObjectAtParentSheetIndex(item, SObject.iridiumBar));
         }
     }
 }
