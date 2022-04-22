@@ -7,6 +7,9 @@ using StardewValley;
 using StardewValley.Objects;
 using SuperHopper.Patches;
 using SObject = StardewValley.Object;
+using System.Collections.Generic;
+using System;
+
 
 namespace SuperHopper
 {
@@ -17,7 +20,8 @@ namespace SuperHopper
         *********/
         /// <summary>The <see cref="Item.modData"/> flag which indicates a hopper is a super hopper.</summary>
         private readonly string ModDataFlag = "spacechase0.SuperHopper";
-
+        private static List<Chest> junimoHoppersPush;
+        private static List<Chest> junimoHoppersPull;
 
         /*********
         ** Public methods
@@ -32,6 +36,9 @@ namespace SuperHopper
             HarmonyPatcher.Apply(this,
                 new ObjectPatcher(this.OnMachineMinutesElapsed)
             );
+            
+            junimoHoppersPush = new List<Chest>();
+            junimoHoppersPull = new List<Chest>();
         }
 
 
@@ -47,15 +54,15 @@ namespace SuperHopper
                 return;
 
             Game1.currentLocation.objects.TryGetValue(e.Cursor.GrabTile, out SObject obj);
-            if (this.TryGetHopper(obj, out Chest chest) && e.Button.IsActionButton())
+            if (this.TryGetHopper(obj, out Chest hopper) && e.Button.IsActionButton())
             {
-                if (chest.heldObject.Value == null)
+                if (hopper.heldObject.Value == null)
                 {
                     if (Utility.IsNormalObjectAtParentSheetIndex(Game1.player.ActiveObject, SObject.iridiumBar))
                     {
-                        chest.Tint = Color.DarkViolet;
-                        chest.heldObject.Value = (SObject)Game1.player.ActiveObject.getOne();
-                        chest.modData[this.ModDataFlag] = "1";
+                        hopper.Tint = Color.DarkViolet;
+                        hopper.heldObject.Value = (SObject)Game1.player.ActiveObject.getOne();
+                        hopper.modData[this.ModDataFlag] = "1";
 
                         if (Game1.player.ActiveObject.Stack > 1)
                             Game1.player.ActiveObject.Stack--;
@@ -67,9 +74,16 @@ namespace SuperHopper
                 }
                 else if (Game1.player.CurrentItem == null)
                 {
-                    chest.Tint = Color.White;
-                    chest.heldObject.Value = null;
-                    chest.modData.Remove(this.ModDataFlag);
+                    hopper.Tint = Color.White;
+                    hopper.heldObject.Value = null;
+                    hopper.modData.Remove(this.ModDataFlag);
+                    
+                    if (junimoHoppersPush.Contains(hopper)) {
+                        junimoHoppersPush.Remove(hopper);
+                    }
+                    if (junimoHoppersPull.Contains(hopper)) {
+                        junimoHoppersPull.Remove(hopper);
+                    }
 
                     Game1.player.addItemToInventory(new SObject(SObject.iridiumBar, 1));
 
@@ -86,25 +100,67 @@ namespace SuperHopper
             // not super hopper
             if (!this.TryGetHopper(machine, out Chest hopper) || hopper.heldObject.Value == null || !Utility.IsNormalObjectAtParentSheetIndex(hopper.heldObject.Value, SObject.iridiumBar))
                 return;
+            
+            bool turnPull = junimoHoppersPull.Count == 0 || !junimoHoppersPull.Contains(hopper) || junimoHoppersPull[0] == hopper;
+            bool turnPush = junimoHoppersPush.Count == 0 || !junimoHoppersPush.Contains(hopper) || junimoHoppersPush[0] == hopper;
 
+            Log.Info($"Starting {hopper} {hopper.TileLocation} turnPull:{turnPull} turnPush:{turnPush}");
             // fix flag if needed
             if (!hopper.modData.ContainsKey(this.ModDataFlag))
                 hopper.modData[this.ModDataFlag] = "1";
 
             // no chests to transfer
-            if (!location.objects.TryGetValue(hopper.TileLocation - new Vector2(0, 1), out SObject objAbove) || objAbove is not Chest chestAbove)
+            if (!location.objects.TryGetValue(hopper.TileLocation - new Vector2(0, 1), out SObject objAbove) ||
+                objAbove is not Chest  chestAbove)
                 return;
             if (!location.objects.TryGetValue(hopper.TileLocation + new Vector2(0, 1), out SObject objBelow) || objBelow is not Chest chestBelow)
                 return;
-
+            
+            bool PullingJunimo = objAbove is Chest { SpecialChestType: Chest.SpecialChestTypes.JunimoChest };
+            bool PushingJunimo = objBelow is Chest { SpecialChestType: Chest.SpecialChestTypes.JunimoChest };
+            
+            Log.Info($"Junimo? PullingJunimo:{PullingJunimo} PushingJunimo:{PushingJunimo}");
             // transfer items
             chestAbove.clearNulls();
-            for (int i = chestAbove.items.Count - 1; i >= 0; i--)
-            {
-                Item item = chestAbove.items[i];
-                if (chestBelow.addItem(item) == null)
-                    chestAbove.items.RemoveAt(i);
+
+            bool moved = false;
+
+            if ((turnPull || !PullingJunimo) && (turnPush || !PushingJunimo)) {
+                for (int i = chestAbove.GetItemsForPlayer(Game1.player.UniqueMultiplayerID).Count - 1; (i >= 0 && ((!(PullingJunimo || PushingJunimo)) || !moved)); i--)
+                {
+                    Item item = chestAbove.GetItemsForPlayer(Game1.player.UniqueMultiplayerID)[i];
+                    if (chestBelow.addItem(item) == null) { 
+                        chestAbove.GetItemsForPlayer(Game1.player.UniqueMultiplayerID).RemoveAt(i);
+                        moved = true;
+                    }
+                }
             }
+            if (PullingJunimo && turnPull && (!moved) && (!junimoHoppersPull.Contains(hopper))) {
+                junimoHoppersPull.Add(hopper);
+                Log.Info($"Add to pull");
+            }
+            if (PushingJunimo && !chestAbove.isEmpty() && turnPush && (!moved) && (!junimoHoppersPush.Contains(hopper))) {
+                junimoHoppersPush.Add(hopper);
+                Log.Info($"Add to push");
+            }
+            else if (moved){
+                if (junimoHoppersPush.Contains(hopper)) junimoHoppersPush.Remove(hopper);
+                if (PushingJunimo && !chestAbove.isEmpty()) junimoHoppersPush.Add(hopper);
+                if (junimoHoppersPull.Contains(hopper)) junimoHoppersPull.Remove(hopper);
+                if (PullingJunimo) junimoHoppersPull.Add(hopper);
+                Log.Info("Add Bot");
+            }else if (!moved && PullingJunimo && turnPull && !chestAbove.isEmpty())
+            {
+                if (junimoHoppersPull.Contains(hopper)) junimoHoppersPull.Remove(hopper);
+                if (PullingJunimo) junimoHoppersPull.Add(hopper);
+            }
+        Log.Info("Push Queue");
+        junimoHoppersPush.ForEach(i => Log.Info($"{i.TileLocation}"));
+        Log.Info("Pull Queue");
+        junimoHoppersPull.ForEach(i => Log.Info($"{i.TileLocation}"));
+        Log.Info("===");
+
+
         }
 
         /// <summary>Get the hopper instance if the object is a hopper.</summary>
