@@ -20,6 +20,7 @@ namespace SuperHopper
         *********/
         /// <summary>The <see cref="Item.modData"/> flag which indicates a hopper is a super hopper.</summary>
         private readonly string ModDataFlag = "spacechase0.SuperHopper";
+        private const LOG_MODE = false;
         private static List<Chest> junimoHoppersPush;
         private static List<Chest> junimoHoppersPull;
 
@@ -128,7 +129,7 @@ namespace SuperHopper
             bool turnPull = junimoHoppersPull.Count == 0 || !junimoHoppersPull.Contains(hopper) || junimoHoppersPull[0] == hopper;
             bool turnPush = junimoHoppersPush.Count == 0 || !junimoHoppersPush.Contains(hopper) || junimoHoppersPush[0] == hopper;
 
-            Log.Info($"Starting {hopper} {hopper.TileLocation} turnPull:{turnPull} turnPush:{turnPush}");
+            if (LOG_MODE) Log.Info($"Starting {hopper} {hopper.TileLocation} turnPull:{turnPull} turnPush:{turnPush}");
             // fix flag if needed
             if (!hopper.modData.ContainsKey(this.ModDataFlag))
                 hopper.modData[this.ModDataFlag] = "1";
@@ -152,8 +153,8 @@ namespace SuperHopper
             //bool PullingJunimo = inChest.specialChestType == Chest.SpecialChestTypes.JunimoChest;
             //bool PushingJunimo = outChest.specialChestType == Chest.SpecialChestTypes.JunimoChest;
             
-            Log.Info($"Junimo? PullingJunimo:{PullingJunimo} PushingJunimo:{PushingJunimo}");
-            Log.Info($"Junimo? {inChest.specialChestType} PullingJunimo:{PullingJunimo} {outChest.specialChestType} PushingJunimo:{PushingJunimo}");
+            //if (LOG_MODE) Log.Info($"Junimo? PullingJunimo:{PullingJunimo} PushingJunimo:{PushingJunimo}");
+            if (LOG_MODE) Log.Info($"Junimo? {inChest.specialChestType} PullingJunimo:{PullingJunimo} {outChest.specialChestType} PushingJunimo:{PushingJunimo}");
             // transfer items
             inChest.clearNulls();
 
@@ -171,30 +172,30 @@ namespace SuperHopper
             }
             if (PullingJunimo && turnPull && (!moved) && (!junimoHoppersPull.Contains(hopper))) {
                 junimoHoppersPull.Add(hopper);
-                Log.Info($"Add to pull");
+                if (LOG_MODE) Log.Info($"Add to pull");
             }
             if (PushingJunimo && !inChest.isEmpty() && turnPush && (!moved) && (!junimoHoppersPush.Contains(hopper))) {
                 junimoHoppersPush.Add(hopper);
-                Log.Info($"Add to push");
+                if (LOG_MODE) Log.Info($"Add to push");
             }
             else if (moved){
                 if (junimoHoppersPush.Contains(hopper)) junimoHoppersPush.Remove(hopper);
                 if (PushingJunimo && !inChest.isEmpty()) junimoHoppersPush.Add(hopper);
                 if (junimoHoppersPull.Contains(hopper)) junimoHoppersPull.Remove(hopper);
                 if (PullingJunimo) junimoHoppersPull.Add(hopper);
-                Log.Info("Add Bot");
+                if (LOG_MODE) Log.Info("Add Bot");
             }else if (!moved && PullingJunimo && turnPull && !inChest.isEmpty())
             {
                 if (junimoHoppersPull.Contains(hopper)) junimoHoppersPull.Remove(hopper);
                 if (PullingJunimo) junimoHoppersPull.Add(hopper);
             }
-        Log.Info("Push Queue");
-        junimoHoppersPush.ForEach(i => Log.Info($"{i.TileLocation}"));
-        Log.Info("Pull Queue");
-        junimoHoppersPull.ForEach(i => Log.Info($"{i.TileLocation}"));
-        Log.Info("===");
-
-
+            if (LOG_MODE) {
+                Log.Info("Push Queue");
+                junimoHoppersPush.ForEach(i => Log.Info($"{i.TileLocation}"));
+                Log.Info("Pull Queue");
+                junimoHoppersPull.ForEach(i => Log.Info($"{i.TileLocation}"));
+                Log.Info("===");
+            }
         }
 
         /// <summary>Get the hopper instance if the object is a hopper.</summary>
