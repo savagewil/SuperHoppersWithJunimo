@@ -100,7 +100,12 @@ namespace SuperHopper
             // not super hopper
             if (!this.TryGetHopper(machine, out Chest hopper) || hopper.heldObject.Value == null || !Utility.IsNormalObjectAtParentSheetIndex(hopper.heldObject.Value, SObject.iridiumBar))
                 return;
-            
+            if (junimoHoppersPull.Contains(hopper))
+            {
+                hopper = junimoHoppersPull[0];
+            }else if (junimoHoppersPush.Contains(hopper)){
+                hopper = junimoHoppersPush[0];
+            }
             bool turnPull = junimoHoppersPull.Count == 0 || !junimoHoppersPull.Contains(hopper) || junimoHoppersPull[0] == hopper;
             bool turnPush = junimoHoppersPush.Count == 0 || !junimoHoppersPush.Contains(hopper) || junimoHoppersPush[0] == hopper;
 
@@ -111,10 +116,28 @@ namespace SuperHopper
 
             // no chests to transfer
             if (!location.objects.TryGetValue(hopper.TileLocation - new Vector2(0, 1), out SObject objAbove) ||
-                objAbove is not Chest  chestAbove)
+                objAbove is not Chest chestAbove)
+            {
+                if (junimoHoppersPull.Contains(hopper))
+                {
+                    junimoHoppersPull.Remove(hopper);
+                }else if (junimoHoppersPush.Contains(hopper))
+                {
+                    junimoHoppersPush.Remove(hopper);
+                }
                 return;
+            }
             if (!location.objects.TryGetValue(hopper.TileLocation + new Vector2(0, 1), out SObject objBelow) || objBelow is not Chest chestBelow)
+            {
+                if (junimoHoppersPull.Contains(hopper))
+                {
+                    junimoHoppersPull.Remove(hopper);
+                }else if (junimoHoppersPush.Contains(hopper))
+                {
+                    junimoHoppersPush.Remove(hopper);
+                }
                 return;
+            }
             
             bool PullingJunimo = objAbove is Chest { SpecialChestType: Chest.SpecialChestTypes.JunimoChest };
             bool PushingJunimo = objBelow is Chest { SpecialChestType: Chest.SpecialChestTypes.JunimoChest };
